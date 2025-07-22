@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { db } from "../firebaseConfig";
+import { collection, getDocs, onSnapshot, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, doc } from "firebase/firestore";
 
 interface Reserva {
-  id: number;
+  id: string;
   data: string;
   horario: string;
   auditorio: string;
@@ -46,14 +48,30 @@ export default function ReservaAuditorio() {
   // Estados para melhorias de UX
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [loading, setLoading] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
-  // Carregar dados do localStorage na montagem
+  // Carregar dados do Firestore na montagem
   useEffect(() => {
-    const savedReservas = localStorage.getItem("reservas");
-    if (savedReservas) {
-      setReservas(JSON.parse(savedReservas));
-    }
+    const q = query(collection(db, "reservas"), orderBy("data", "asc"));
+    // Escuta em tempo real
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const reservasFirestore = snapshot.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          data: data.data || "",
+          horario: data.horario || "",
+          auditorio: data.auditorio || "",
+          solicitante: data.solicitante || "",
+          evento: data.evento || "",
+          status: data.status || "Reservado",
+          observacoes: data.observacoes || "",
+          createdAt: data.createdAt ? new Date(data.createdAt.seconds ? data.createdAt.seconds * 1000 : data.createdAt) : new Date(),
+        } as Reserva;
+      });
+      setReservas(reservasFirestore);
+    });
+    return () => unsubscribe();
   }, []);
 
   // Salvar no localStorage sempre que reservas mudar
@@ -98,43 +116,42 @@ export default function ReservaAuditorio() {
     }
   };
 
-  // Função para verificar duplicidade (excluindo a reserva sendo editada)
-  const verificarDuplicidade = (data: string, horario: string, auditorio: string, idExcluir?: number): boolean => {
+  // Função auxiliar para converter horário (ex: '09h', '09h-12h', '09:30-12:00', '10h30-12h', '10h', '10:30') em minutos desde 00:00
+  function horarioParaMinutos(horario: string): [number, number] {
+    // Aceita formatos: '09h', '09h-12h', '09:30-12:00', '10h30-12h', '10h', '10:30'
+    const normalizar = (h: string) => {
+      let [hora, min] = h.replace('h', ':').split(':');
+      return parseInt(hora) * 60 + (min ? parseInt(min) : 0);
+    };
+    if (horario.includes('-')) {
+      const [inicio, fim] = horario.split('-').map(s => s.trim());
+      return [normalizar(inicio), normalizar(fim)];
+    } else {
+      const inicio = normalizar(horario.trim());
+      // Considera 1h de duração se não for intervalo
+      return [inicio, inicio + 60];
+    }
+  }
+
+  // Função para verificar duplicidade (agora impede sobreposição de horários)
+  const verificarDuplicidade = (data: string, horario: string, auditorio: string, idExcluir?: string): boolean => {
     const dataNormalizada = normalizarData(data);
-    console.log('🔍 Verificando duplicidade:', { data, dataNormalizada, horario, auditorio, idExcluir });
-    console.log('📋 Total de reservas existentes:', reservas.length);
-    
-    const duplicada = reservas.some(reserva => {
-      const reservaDataNormalizada = normalizarData(reserva.data);
-      const match = reserva.id !== idExcluir &&
-        reservaDataNormalizada === dataNormalizada && 
-        reserva.horario === horario && 
-        reserva.auditorio === auditorio;
-      
-      console.log('🔍 Comparando com reserva:', {
-        reservaId: reserva.id,
-        reservaData: reserva.data,
-        reservaDataNormalizada,
-        reservaHorario: reserva.horario,
-        reservaAuditorio: reserva.auditorio,
-        match
-      });
-      
-      return match;
+    const [novoInicio, novoFim] = horarioParaMinutos(horario);
+    return reservas.some(reserva => {
+      if (reserva.id === idExcluir) return false;
+      if (normalizarData(reserva.data) !== dataNormalizada) return false;
+      if (reserva.auditorio !== auditorio) return false;
+      const [resInicio, resFim] = horarioParaMinutos(reserva.horario);
+      // Sobreposição: (A começa antes de B terminar) && (A termina depois de B começar)
+      return novoInicio < resFim && novoFim > resInicio;
     });
-    
-    console.log('✅ Resultado verificação duplicidade:', duplicada);
-    return duplicada;
   };
 
-  const addReserva = () => {
+  const addReserva = async () => {
     setLoading(true);
-    
     // Validação dos campos obrigatórios
     if (!formData.data || !formData.horario || !formData.auditorio || !formData.solicitante || !formData.evento) {
       showToast("Por favor, preencha todos os campos obrigatórios!", "error");
-      
-      // Limpar formulário após mensagem de validação
       setFormData({
         data: "",
         horario: "",
@@ -146,33 +163,22 @@ export default function ReservaAuditorio() {
       setLoading(false);
       return;
     }
-
     // Validação de data passada
     const hoje = new Date();
     const dataReserva = new Date(formData.data);
     hoje.setHours(0, 0, 0, 0);
     dataReserva.setHours(0, 0, 0, 0);
-    
     if (dataReserva < hoje) {
       showToast("Não é possível fazer reservas para datas passadas!", "error");
       setLoading(false);
       return;
     }
-
     // Normalizar a data antes de salvar
     const dataNormalizada = normalizarData(formData.data);
-    console.log('💾 Salvando reserva - Data original:', formData.data, 'Data normalizada:', dataNormalizada);
-
     // Validação de duplicidade com data normalizada
-    console.log('🔍 Iniciando verificação de duplicidade...');
     const temDuplicidade = verificarDuplicidade(dataNormalizada, formData.horario, formData.auditorio, reservaEditando?.id);
-    console.log('🔍 Resultado da verificação:', temDuplicidade);
-    
     if (temDuplicidade) {
-      console.log('🚨 Duplicidade detectada! Bloqueando criação...');
       showToast("Já existe uma reserva para este auditório neste horário e data. Por favor, escolha outro horário ou data.", "warning");
-      
-      // Limpar formulário após mensagem de duplicidade
       setFormData({
         data: "",
         horario: "",
@@ -184,36 +190,54 @@ export default function ReservaAuditorio() {
       setLoading(false);
       return;
     }
-    
-    console.log('✅ Nenhuma duplicidade encontrada. Prosseguindo...');
-
     if (editando && reservaEditando) {
-      // Atualizar reserva existente
-      const reservaAtualizada: Reserva = {
-        ...reservaEditando,
-        ...formData,
-        data: dataNormalizada, // Usar data normalizada
-        status: "Reservado",
-      };
-
-      setReservas(reservas.map(r => r.id === reservaEditando.id ? reservaAtualizada : r));
-      setEditando(false);
-      setReservaEditando(null);
-      showToast("Reserva atualizada com sucesso!", "success");
+      // Atualizar reserva existente no Firestore
+      try {
+        const reservaRef = doc(db, "reservas", reservaEditando.id);
+        await updateDoc(reservaRef, {
+          data: dataNormalizada,
+          horario: formData.horario,
+          auditorio: formData.auditorio,
+          solicitante: formData.solicitante,
+          evento: formData.evento,
+          status: "Reservado",
+          observacoes: formData.observacoes,
+        });
+        showToast("Reserva atualizada com sucesso!", "success");
+        setEditando(false);
+        setReservaEditando(null);
+      } catch (error) {
+        showToast("Erro ao atualizar reserva!", "error");
+      }
+      setLoading(false);
+      // Limpar formulário
+      setFormData({
+        data: "",
+        horario: "",
+        auditorio: "",
+        solicitante: "",
+        evento: "",
+        observacoes: "",
+      });
+      return;
     } else {
-      // Criar nova reserva
-      const newReserva: Reserva = {
-        id: Date.now(),
-        ...formData,
-        data: dataNormalizada, // Usar data normalizada
-        status: "Reservado",
-        createdAt: new Date(),
-      };
-
-      setReservas([...reservas, newReserva]);
-      showToast("Reserva criada com sucesso!", "success");
+      // Criar nova reserva no Firestore
+      try {
+        await addDoc(collection(db, "reservas"), {
+          data: dataNormalizada,
+          horario: formData.horario,
+          auditorio: formData.auditorio,
+          solicitante: formData.solicitante,
+          evento: formData.evento,
+          status: "Reservado",
+          observacoes: formData.observacoes,
+          createdAt: serverTimestamp(),
+        });
+        showToast("Reserva criada com sucesso!", "success");
+      } catch (error) {
+        showToast("Erro ao criar reserva!", "error");
+      }
     }
-    
     // Limpar formulário
     setFormData({
       data: "",
@@ -223,7 +247,6 @@ export default function ReservaAuditorio() {
       evento: "",
       observacoes: "",
     });
-    
     setLoading(false);
   };
 
@@ -261,12 +284,16 @@ export default function ReservaAuditorio() {
     });
   };
 
-  const deleteReserva = (id: number) => {
-    setReservas(reservas.filter((reserva) => reserva.id !== id));
-    showToast("Reserva excluída com sucesso!", "success");
+  const deleteReserva = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "reservas", id));
+      showToast("Reserva excluída com sucesso!", "success");
+    } catch (error) {
+      showToast("Erro ao excluir reserva!", "error");
+    }
   };
 
-  const confirmarDelete = (id: number) => {
+  const confirmarDelete = (id: string) => {
     setShowDeleteConfirm(id);
   };
 
@@ -494,10 +521,12 @@ export default function ReservaAuditorio() {
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-cyan-500 to-purple-500 rounded-full mb-6 shadow-lg">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
+            <div className="inline-flex items-center justify-center w-24 h-24 mb-6">
+              <img 
+                src="/logo_ece.jpeg" 
+                alt="Logo ECE" 
+                className="w-20 h-20 object-cover"
+              />
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
               Sistema de Reserva de Auditório
