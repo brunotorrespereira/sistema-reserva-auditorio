@@ -24,6 +24,7 @@ import Login from "./components/Login";
 import Cadastro from "./components/Cadastro";
 import UserAvatarMenu from "./components/UserAvatarMenu";
 import MinhasReservasModal from "./components/MinhasReservasModal";
+import { Metadata } from "next";
 
 interface Reserva {
   id: string;

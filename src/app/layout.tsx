@@ -13,13 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "To-Do List App",
-  description: "Uma aplicação simples de lista de tarefas para organizar suas atividades diárias.",
-  keywords: "todo, tarefas, lista, organização, produtividade",
-  authors: [{ name: "To-Do App" }],
+  title: "ECE Sistema de Reservas",
+  description: "Sistema de reservas de auditório da ECE.",
+  keywords: "reserva, auditório, ECE, sistema",
+  authors: [{ name: "ECE Sistema de Reservas" }],
   openGraph: {
-    title: "To-Do List App",
-    description: "Organize suas tarefas de forma simples e eficiente",
+    title: "ECE Sistema de Reservas",
+    description: "Gerencie e reserve auditórios facilmente na ECE",
   },
 };
 
