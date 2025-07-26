@@ -348,11 +348,11 @@ export default function ReservaAuditorio() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="text-center mb-12">
-          <div className="inline-flex items-center justify-center w-24 h-24 mb-6">
+          <div className="inline-flex items-center justify-center w-40 h-40 mb-6">
             <img
-              src="/logo_ece.jpeg"
+              src="/logo_ece.png"
               alt="Logo ECE"
-              className="w-20 h-20 object-cover"
+              className="w-40 h-40 object-cover"
             />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-white mb-4 bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
@@ -395,6 +395,7 @@ export default function ReservaAuditorio() {
                 value={formData.data}
                 onChange={(e) => setFormData({...formData, data: e.target.value})}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white"
+                style={{ colorScheme: 'dark' }}
                 required
               />
             </div>
@@ -406,6 +407,7 @@ export default function ReservaAuditorio() {
                 value={formData.horarioInicio}
                 onChange={(e) => setFormData({...formData, horarioInicio: e.target.value})}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white"
+                style={{ colorScheme: 'dark' }}
                 required
               />
             </div>
@@ -416,6 +418,7 @@ export default function ReservaAuditorio() {
                 value={formData.horarioFim}
                 onChange={(e) => setFormData({...formData, horarioFim: e.target.value})}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white"
+                style={{ colorScheme: 'dark' }}
                 required
               />
             </div>
