@@ -74,7 +74,7 @@ export default function ReservaAuditorio() {
 
   // Lista de administradores (emails)
   const adminEmails = [
-    "w.brunopereiraa@gmail.com"
+    "erica.a.pac@gmail.com"
   ];
 
   useEffect(() => {
