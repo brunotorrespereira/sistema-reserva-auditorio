@@ -61,7 +61,7 @@ export default function MinhasReservasModal({ open, onClose, reservas, userEmail
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
       <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 w-full max-w-2xl border border-white/20 relative">
         <button
-          className="absolute top-4 left-4 text-white bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm font-semibold transition-colors"
+          className="absolute top-4 left-4 text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
           onClick={exportarPDF}
           disabled={minhasReservas.length === 0}
         >

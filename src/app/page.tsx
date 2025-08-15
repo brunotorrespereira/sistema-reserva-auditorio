@@ -19,7 +19,7 @@ import {
 } from "firebase/auth";
 import { db, auth } from "../firebaseConfig";
 import jsPDF from "jspdf";
-import "jspdf-autotable";
+import autoTable from "jspdf-autotable";
 import Login from "./components/Login";
 import Cadastro from "./components/Cadastro";
 import UserAvatarMenu from "./components/UserAvatarMenu";
@@ -242,6 +242,11 @@ export default function ReservaAuditorio() {
   };
 
   const exportarPDF = () => {
+    if (reservasFiltradas.length === 0) {
+      showToast("Nenhuma reserva para exportar", "info");
+      return;
+    }
+
     const doc = new jsPDF();
     
     // Título
@@ -270,7 +275,7 @@ export default function ReservaAuditorio() {
       reserva.observacoes || "-"
     ]);
     
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [["Data", "Horário", "Auditório", "Solicitante", "Evento", "Observações"]],
       body: tableData,
@@ -279,7 +284,13 @@ export default function ReservaAuditorio() {
       styles: { fontSize: 8 }
     });
     
-    doc.save("reservas_auditorio.pdf");
+    // Nome do arquivo com data atual
+    const dataAtual = new Date();
+    const dataFormatada = dataAtual.toISOString().slice(0, 10);
+    const horaFormatada = dataAtual.toTimeString().slice(0, 8).replace(/:/g, '-');
+    const nomeArquivo = `reservas_auditorio_${dataFormatada}_${horaFormatada}.pdf`;
+    
+    doc.save(nomeArquivo);
     showToast("PDF exportado com sucesso!", "success");
   };
 
@@ -431,7 +442,7 @@ export default function ReservaAuditorio() {
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
                 required
               >
-                <option value="" disabled hidden selected>Selecione um auditório</option>
+                <option value="" disabled hidden>Selecione um auditório</option>
                 <option value="Auditório" className="bg-gray-800">Auditório</option>
                 <option value="Laboratório de Informática" className="bg-gray-800">Laboratório de Informática</option>
               </select>
@@ -526,7 +537,7 @@ export default function ReservaAuditorio() {
                 onChange={(e) => setFiltroAuditorio(e.target.value)}
                 className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-cyan-400 focus:border-transparent"
               >
-                <option value="" disabled hidden selected>Todas as salas</option>
+                <option value="" disabled hidden>Todas as salas</option>
                 <option value="Auditório" className="bg-gray-800">Auditório</option>
                 <option value="Laboratório de Informática" className="bg-gray-800">Laboratório de Informática</option>
               </select>
